@@ -9,19 +9,30 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   integration:
     if: ${{ vars.ENABLE_TEST_FLEET_INTEGRATION == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
+      - name: Require protected cross-organization read credential
+        env:
+          TEST_FLEET_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$TEST_FLEET_READ_TOKEN"
+          printf 'protected source access enabled\n'
       - name: Check out source pins and submodules
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           show-progress: false
           submodules: recursive
-          token: ${{ secrets.TEST_FLEET_READ_TOKEN || github.token }}
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
       - name: Validate contract
         run: node scripts/validate-plan.mjs
       - name: Explain profile gate
@@ -29,3 +40,43 @@ jobs:
           echo "Profile: cli-contract"
           echo "Required checks are defined in test-plan.json."
           echo "Add product-specific executable fixtures here without weakening the generated contract."
+
+  certification-status:
+    name: Record protected source access status
+    if: always()
+    needs: integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Write source-integration status
+        env:
+          ENABLED: ${{ vars.ENABLE_TEST_FLEET_INTEGRATION }}
+          RESULT: ${{ needs.integration.result }}
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const result = process.env.RESULT || 'unknown';
+          const enabled = process.env.ENABLED === 'true';
+          const executed = result !== 'skipped';
+          const sourceAccessPassed = result === 'success';
+          const report = {
+            schemaVersion: 2,
+            enabled,
+            executed,
+            sourceAccessPassed,
+            certified: false,
+            result,
+            reason: sourceAccessPassed ? 'protected-source-access-passed-product-certification-required'
+              : executed ? 'protected-source-access-did-not-pass'
+                : 'protected-source-integration-not-enabled',
+          };
+          fs.writeFileSync('source-integration-status.json', JSON.stringify(report, null, 2) + '\n');
+          console.log(JSON.stringify(report));
+          NODE
+      - name: Upload source-integration status
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: source-integration-status-${{ github.sha }}
+          path: source-integration-status.json
+          if-no-files-found: error
+          retention-days: 14

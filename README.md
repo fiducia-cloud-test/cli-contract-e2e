@@ -19,7 +19,7 @@ Source organization: `fiducia-cloud`
 
 | Source | Commit | Branch observed |
 |---|---:|---|
-| `fiducia-cloud/fiducia-cli.rs` | `ee0b280ed96805d2a37b874e9df6e90b3c0c8191` | `main` |
+| `fiducia-cloud/fiducia-cli.rs` | `fec51655cc59d1f1327f58d0b525b34d1d7df5f3` | `main` |
 
 ## Dependency lanes
 
@@ -29,5 +29,5 @@ Source organization: `fiducia-cloud`
 
 ## Running
 
-The pull-request workflow validates the generated contract without cross-organization credentials. Full integration is intentionally release-gated until required source repositories and organization read credentials are present. Run the profile-specific checks recorded in `test-plan.json` after materializing the submodule, Zed, or native-package lane.
+The pull-request workflow validates the generated contract without cross-organization credentials. Product-specific files outside the generated file set are preserved and must add executable assertions without weakening the base contract. Full integration is intentionally release-gated until required source repositories and organization read credentials are present. The generic protected lane reports source-access status only; source certification requires a product-specific executable overlay. A skipped integration job is not source certification. Run the profile-specific checks recorded in `test-plan.json` after materializing the submodule, Zed, or native-package lane.
 
