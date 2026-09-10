@@ -1,0 +1,83 @@
+name: flags-2-env + RPC conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composition:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.1"
+          package-manager-cache: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Check out immutable flags-2-env
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: flags-2-env/flags-2-env
+          ref: b708a041531a830bd49f030250836896096e7abd
+          path: .contract-tools/flags2env
+          persist-credentials: false
+          show-progress: false
+      - name: Check out immutable merged RPC authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ORESoftware/api-docs
+          ref: 12127a82ff1c0c34096faaf6df1a2a8484ea2feb
+          path: .contract-tools/api-docs
+          persist-credentials: false
+          show-progress: false
+      - name: Audit canonical argv contract and RPC composition
+        run: |
+          set -euo pipefail
+          test "$(git -C .contract-tools/flags2env rev-parse HEAD)" = "b708a041531a830bd49f030250836896096e7abd"
+          test "$(git -C .contract-tools/api-docs rev-parse HEAD)" = "12127a82ff1c0c34096faaf6df1a2a8484ea2feb"
+          npm ci --prefix .contract-tools/flags2env --no-audit --no-fund
+          node .contract-tools/flags2env/clients/nodejs/cli.mjs audit .cli-flags.toml > /tmp/f2e-audit.json
+          tool=.contract-tools/api-docs/scripts/ores_rpc_config.py
+          python3 "$tool" --repo-root "$GITHUB_WORKSPACE" check
+          python3 "$tool" --repo-root "$GITHUB_WORKSPACE" resolve --target client > /tmp/client.json
+          jq -e '.role == "client" and .endpointEnv == "API_BASE_URL"' /tmp/client.json
+      - name: Reject secret argv and missing flags contract
+        run: |
+          set -euo pipefail
+          tool=.contract-tools/api-docs/scripts/ores_rpc_config.py
+          mkdir -p tmp/rpc-invalid
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('.ores-rpc.toml').read_text()
+          Path('tmp/rpc-invalid/secret-argv.toml').write_text(src.replace('secret = true\nallowArgv = false', 'secret = true\nallowArgv = true'))
+          Path('tmp/rpc-invalid/no-flags.toml').write_text(src.replace('flagsContract = ".cli-flags.toml"\n', ''))
+          PY
+          for f in tmp/rpc-invalid/*.toml; do
+            if python3 "$tool" --repo-root "$GITHUB_WORKSPACE" --manifest "$f" check; then exit 1; fi
+          done
+      - name: Re-run TJSV peer-authority admission
+        uses: ORESoftware/typespec-json-schema-validator@d60d0d79d83e075077382623ec9e23a401ab601f
+        with:
+          typespec: .contract-tools/api-docs/contracts/ores-rpc-config/typespec/main.tsp
+          schema: .contract-tools/api-docs/contracts/ores-rpc-config/json-schema/ores-rpc-config.schema.json
+          mapping: .contract-tools/api-docs/contracts/ores-rpc-config/tjsv.mapping.json
+          report: .typespec-json-schema-validator/ores-rpc-config/report.json
+          sarif: .typespec-json-schema-validator/ores-rpc-config/report.sarif
+          contract_ir: .typespec-json-schema-validator/ores-rpc-config/contract-ir.json
+          output_dir: .typespec-json-schema-validator/ores-rpc-config/generated
+          int64_strategy: number
+          quiet: "false"
+      - name: Require zero drift
+        run: jq -e '.status == "passed" and .zeroUnexplainedFindings == true and .authorities.precedence == "none" and (.differential.summary.divergences // 0) == 0' .typespec-json-schema-validator/ores-rpc-config/report.json

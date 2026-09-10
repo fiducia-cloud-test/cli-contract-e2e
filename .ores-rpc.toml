@@ -1,0 +1,31 @@
+schemaVersion = "ores.rpc.config.v1"
+repositoryMode = "client-only"
+strict = true
+flagsContract = ".cli-flags.toml"
+defaultTarget = "client"
+
+[[env]]
+name = "apiBaseUrl"
+env = "API_BASE_URL"
+valueType = "string"
+required = true
+secret = false
+allowArgv = true
+
+[[env]]
+name = "serviceCredential"
+env = "RPC_SERVICE_CREDENTIAL"
+valueType = "string"
+required = false
+secret = true
+allowArgv = false
+
+[[targets]]
+name = "client"
+role = "client"
+roots = ["."]
+rpcVersion = "v1"
+transports = ["http"]
+framing = "json"
+endpointEnv = "API_BASE_URL"
+propagateHeaders = ["traceparent", "x-request-id"]
