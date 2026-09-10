@@ -1,0 +1,14 @@
+[help]
+url = "https://github.com/fiducia-cloud-test/cli-contract-e2e"
+
+[env]
+load = false
+
+[parse]
+allow_unknown = false
+
+[flags.api-base]
+env = "API_BASE_URL"
+aliases = ["api-base"]
+type = "string"
+help = "Non-secret RPC API base URL override."
