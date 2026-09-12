@@ -1,0 +1,96 @@
+name: ORES CLI peer-authority lint contract
+
+on:
+  pull_request:
+    paths:
+      - "contracts/ores-cli-lint/**"
+      - "fixtures/ores-cli-peer-authority-pins.json"
+      - "tests/ores_cli_peer_authority_lint.test.mjs"
+      - ".github/workflows/ores-cli-peer-authority-lint.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/ores-cli-lint/**"
+      - "fixtures/ores-cli-peer-authority-pins.json"
+      - "tests/ores_cli_peer_authority_lint.test.mjs"
+      - ".github/workflows/ores-cli-peer-authority-lint.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ores-cli-peer-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify checked-out revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v5.0.0
+        with:
+          node-version: 22.16.0
+          check-latest: false
+
+      - name: Run independent ores-cli lint acceptance model
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check tests/ores_cli_peer_authority_lint.test.mjs
+          node --test tests/ores_cli_peer_authority_lint.test.mjs
+
+      - name: Transpile TypeSpec to Schema B and compare authored Schema A
+        uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: contracts/ores-cli-lint/main.tsp
+          schema: contracts/ores-cli-lint/authored.schema.json
+          report: .typespec-json-schema-validator/ores-cli-lint/report.json
+          contract_ir: .typespec-json-schema-validator/ores-cli-lint/contract-ir.json
+          output_dir: .typespec-json-schema-validator/ores-cli-lint/generated
+          max_probes: "64"
+
+      - name: Verify current peer inputs and complete declaration scope
+        uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405
+        with:
+          typespec: contracts/ores-cli-lint/main.tsp
+          schema: contracts/ores-cli-lint/authored.schema.json
+          generated_schema: .typespec-json-schema-validator/ores-cli-lint/generated/typespec.generated.schema.json
+          contract_ir: .typespec-json-schema-validator/ores-cli-lint/contract-ir.json
+          report: .typespec-json-schema-validator/ores-cli-lint/report.json
+          expected_declarations: '["OresCliLint.AuthorityRole","OresCliLint.WorkflowBinding"]'
+          verification: .typespec-json-schema-validator/ores-cli-lint/verification.json
+
+      - name: Prove authored authorities stayed immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- contracts/ores-cli-lint/
+          git diff --check
+
+      - name: Retain diagnostic comparison evidence
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ores-cli-peer-authority-${{ github.sha }}
+          path: .typespec-json-schema-validator/ores-cli-lint/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30

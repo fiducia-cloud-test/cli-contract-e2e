@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "authored.ores-cli-lint.schema.json",
+  "$defs": {
+    "AuthorityRole": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "AuthorityRole",
+      "type": "string",
+      "enum": ["typespec", "json-schema"]
+    },
+    "WorkflowBinding": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "WorkflowBinding",
+      "type": "object",
+      "properties": {
+        "typespec": { "type": "string" },
+        "schema": { "type": "string" },
+        "generatedSchema": { "type": "string" },
+        "contractIr": { "type": "string" },
+        "report": { "type": "string" },
+        "outputDir": { "type": "string" },
+        "authority": { "$ref": "AuthorityRole" }
+      },
+      "required": [
+        "typespec",
+        "schema",
+        "generatedSchema",
+        "contractIr",
+        "report",
+        "outputDir",
+        "authority"
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
