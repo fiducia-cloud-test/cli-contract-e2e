@@ -1,0 +1,56 @@
+name: CLI Zed package contract
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cli-zed-package-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out exact CLI candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: fiducia-cloud/fiducia-cli.rs
+          ref: b1ed1d10c649d09f79e315c5d8e813429c454067
+          path: candidate
+          persist-credentials: false
+      - name: Verify exact source and package graph
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = b1ed1d10c649d09f79e315c5d8e813429c454067
+          python3 - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          root = Path('candidate')
+          zpkg = tomllib.loads((root / '.zpkg.toml').read_text())
+          cargo = tomllib.loads((root / 'Cargo.toml').read_text())
+
+          assert zpkg['package']['org'] == 'fiducia-cloud'
+          assert zpkg['package']['name'] == 'fiducia-cli'
+          assert zpkg['package']['version'] == '0.1.0'
+          assert zpkg['dependencies'] == {
+              'fiducia-cloud/fiducia-clients': '^0.1.0',
+              'fiducia-cloud/fiducia-interfaces': '^0.1.0',
+              'fiducia-cloud/fiducia-lib': '^0.1.0',
+          }
+          assert zpkg['build']['command'] == 'cargo build --release --locked --bin fiducia'
+          assert zpkg['build']['outputs'] == ['target/release/fiducia']
+          assert zpkg['bin']['fiducia'] == 'target/release/fiducia'
+          bins = cargo.get('bin', [])
+          assert any(item.get('name') == 'fiducia' and item.get('path') == 'src/main.rs' for item in bins)
+          assert 'target/**' in zpkg['publish']['exclude']
+          print('canonical Fiducia CLI Zed dependency graph is internally consistent')
+          PY
