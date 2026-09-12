@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "ORESoftware/ores-cli",
+  "workflowBindingPr": {
+    "number": 194,
+    "head": "ad997afd7a19d4c9864ce74a4a0e958b79b99b36"
+  },
+  "generatedEvidencePr": {
+    "number": 191,
+    "head": "3893f8473c6b178d892b586469cb84469d9215fa"
+  },
+  "contractTreePr": {
+    "number": 193,
+    "head": "d5dc735013b8e82489403f3a3c141e95b014790a"
+  },
+  "validator": "93dd73cb246a09b0a1c62d7192cc62ca6ecbe405",
+  "claims": {
+    "runtimeCertified": false,
+    "typespecFirstClass": true,
+    "jsonSchemaFirstClass": true,
+    "generatedSchemaAuthoritative": false
+  }
+}
