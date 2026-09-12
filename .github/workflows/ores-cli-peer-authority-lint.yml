@@ -5,14 +5,14 @@ on:
     paths:
       - "contracts/ores-cli-lint/**"
       - "fixtures/ores-cli-peer-authority-pins.json"
-      - "tests/ores_cli_peer_authority_lint.test.mjs"
+      - "tests/ores_cli_*.test.mjs"
       - ".github/workflows/ores-cli-peer-authority-lint.yml"
   push:
     branches: [main]
     paths:
       - "contracts/ores-cli-lint/**"
       - "fixtures/ores-cli-peer-authority-pins.json"
-      - "tests/ores_cli_peer_authority_lint.test.mjs"
+      - "tests/ores_cli_*.test.mjs"
       - ".github/workflows/ores-cli-peer-authority-lint.yml"
   workflow_dispatch:
 
@@ -49,12 +49,14 @@ jobs:
           node-version: 22.16.0
           check-latest: false
 
-      - name: Run independent ores-cli lint acceptance model
+      - name: Run independent ores-cli lint acceptance models
         shell: bash
         run: |
           set -euo pipefail
-          node --check tests/ores_cli_peer_authority_lint.test.mjs
-          node --test tests/ores_cli_peer_authority_lint.test.mjs
+          for test_file in tests/ores_cli_*.test.mjs; do
+            node --check "$test_file"
+          done
+          node --test tests/ores_cli_*.test.mjs
 
       - name: Transpile TypeSpec to Schema B and compare authored Schema A
         uses: ORESoftware/typespec-json-schema-validator@93dd73cb246a09b0a1c62d7192cc62ca6ecbe405

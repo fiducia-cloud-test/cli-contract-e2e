@@ -3,7 +3,7 @@
   "sourceRepository": "ORESoftware/ores-cli",
   "workflowBindingPr": {
     "number": 194,
-    "head": "ad997afd7a19d4c9864ce74a4a0e958b79b99b36"
+    "head": "40bc47a90d7f5395a11be277949622762ba7b5bf"
   },
   "generatedEvidencePr": {
     "number": 191,
@@ -18,6 +18,7 @@
     "runtimeCertified": false,
     "typespecFirstClass": true,
     "jsonSchemaFirstClass": true,
-    "generatedSchemaAuthoritative": false
+    "generatedSchemaAuthoritative": false,
+    "comparisonAndVerificationPaired": true
   }
 }
