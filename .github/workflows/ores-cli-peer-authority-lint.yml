@@ -6,6 +6,7 @@ on:
       - "contracts/ores-cli-lint/**"
       - "fixtures/ores-cli-peer-authority-pins.json"
       - "tests/ores_cli_*.test.mjs"
+      - "certification/ores-cli-current-tjsv/**"
       - ".github/workflows/ores-cli-peer-authority-lint.yml"
   push:
     branches: [main]
@@ -13,6 +14,7 @@ on:
       - "contracts/ores-cli-lint/**"
       - "fixtures/ores-cli-peer-authority-pins.json"
       - "tests/ores_cli_*.test.mjs"
+      - "certification/ores-cli-current-tjsv/**"
       - ".github/workflows/ores-cli-peer-authority-lint.yml"
   workflow_dispatch:
 
@@ -43,8 +45,45 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
 
+      - name: Validate exact ores-cli forward-canary mirror
+        uses: docker://rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+        with:
+          args: certification/ores-cli-current-tjsv/tjsv-current-forward-canary.yml
+
+      - name: Prove exact ores-cli #278 workflow and policy lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          cert=certification/ores-cli-current-tjsv
+          workflow="$cert/tjsv-current-forward-canary.yml"
+          expected_blob=b7803f4f83035b1417a1e6e991409da9aed8878c
+          expected_product=82ef4bae526abc64987a16485429f14a9ee04924
+          expected_tjsv=c5392b03a405bb5296d1de09ac785b3b097529cd
+          test "$(git hash-object "$workflow")" = "$expected_blob"
+          jq -e --arg blob "$expected_blob" --arg product "$expected_product" --arg tjsv "$expected_tjsv" '
+            .schema == "ores.test.source-lock/v1" and
+            .repository == "ORESoftware/ores-cli" and
+            .pullRequest == 278 and
+            .commit == $product and
+            .focus == ".github/workflows/tjsv-current-forward-canary.yml" and
+            .focusBlob == $blob and
+            .certificate.mode == "byte-identical-product-mirror" and
+            .validator.repository == "ORESoftware/typespec-json-schema-validator" and
+            .validator.revision == $tjsv and
+            .validator.role == "forward-compatibility-canary-only" and
+            .productionLockPolicy.mustRemainIndependent == true and
+            .productionLockPolicy.mustNotBePromotedByCanary == true and
+            .authorityModel.typespec == "independently-authored-first-class" and
+            .authorityModel.jsonSchema == "independently-authored-draft-2020-12-first-class" and
+            .authorityModel.generatedJsonSchema == "comparison-evidence-only" and
+            .authorityModel.precedence == "none"
+          ' "$cert/source-lock.json" >/dev/null
+          grep -Fq "TJSV_CANARY_SHA: $expected_tjsv" "$workflow"
+          test "$(grep -Fc "@$expected_tjsv" "$workflow")" -eq 2
+          grep -Fq "test \"\$(jq -r '.revision' tjsv/source-lock.json)\" != \"\$TJSV_CANARY_SHA\"" "$workflow"
+
       - name: Install Node.js 22
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v5.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.16.0
           check-latest: false
@@ -59,7 +98,7 @@ jobs:
           node --test tests/ores_cli_*.test.mjs
 
       - name: Transpile TypeSpec to Schema B and compare authored Schema A
-        uses: ORESoftware/typespec-json-schema-validator@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           typespec: contracts/ores-cli-lint/main.tsp
           schema: contracts/ores-cli-lint/authored.schema.json
@@ -69,7 +108,7 @@ jobs:
           max_probes: "64"
 
       - name: Verify current peer inputs and complete declaration scope
-        uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@a952c53b4628b1d12e21ed51879d910a8c19a581
+        uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@c5392b03a405bb5296d1de09ac785b3b097529cd
         with:
           typespec: contracts/ores-cli-lint/main.tsp
           schema: contracts/ores-cli-lint/authored.schema.json
