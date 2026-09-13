@@ -1,0 +1,120 @@
+name: current TJSV forward-compatibility canary
+
+on:
+  pull_request:
+    paths:
+      - 'contracts/source-audit/**'
+      - 'tjsv/source-lock.json'
+      - '.github/workflows/tjsv-current-forward-canary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tjsv-current-forward-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  TJSV_CANARY_SHA: c5392b03a405bb5296d1de09ac785b3b097529cd
+
+jobs:
+  current-validator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact ores-cli candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact candidate and preserve production source lock
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          jq -e '
+            .schema == "ores.tjsv-source-lock/v1" and
+            .repository == "ORESoftware/typespec-json-schema-validator" and
+            (.revision | type == "string" and length == 40)
+          ' tjsv/source-lock.json >/dev/null
+          test "$(jq -r '.revision' tjsv/source-lock.json)" != "$TJSV_CANARY_SHA"
+
+      - name: Run current TJSV without changing the production lock
+        uses: ORESoftware/typespec-json-schema-validator@c5392b03a405bb5296d1de09ac785b3b097529cd
+        with:
+          typespec: contracts/source-audit/main.tsp
+          schema: contracts/source-audit/authored.schema.json
+          mapping: contracts/source-audit/tjsv.mapping.json
+          instances: contracts/source-audit/instances
+          report: .typespec-json-schema-validator/current-forward/report.json
+          sarif: .typespec-json-schema-validator/current-forward/report.sarif
+          contract_ir: .typespec-json-schema-validator/current-forward/contract-ir.json
+          output_dir: .typespec-json-schema-validator/current-forward/generated
+          int64_strategy: number
+          quiet: 'false'
+
+      - name: Verify current input closure and exact declaration scope
+        uses: ORESoftware/typespec-json-schema-validator/actions/verify-contract-ir@c5392b03a405bb5296d1de09ac785b3b097529cd
+        with:
+          contract_ir: .typespec-json-schema-validator/current-forward/contract-ir.json
+          report: .typespec-json-schema-validator/current-forward/report.json
+          typespec: contracts/source-audit/main.tsp
+          schema: contracts/source-audit/authored.schema.json
+          generated_schema: .typespec-json-schema-validator/current-forward/generated/typespec.generated.schema.json
+          expected_declarations: '["Ores.Cli.SourceAudit.V1.AstEvent","Ores.Cli.SourceAudit.V1.AstEventKind","Ores.Cli.SourceAudit.V1.CodeConfigAuditReceipt","Ores.Cli.SourceAudit.V1.RegexEvent","Ores.Cli.SourceAudit.V1.RegexEventKind","Ores.Cli.SourceAudit.V1.SourceFileEvidence","Ores.Cli.SourceAudit.V1.SourceLanguage","Ores.Cli.SourceAudit.V1.SourceParser"]'
+          verification: .typespec-json-schema-validator/current-forward/consumer-verification.json
+
+      - name: Assert first-class peer-authority semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -e '
+            .status == "passed" and
+            .zeroUnexplainedFindings == true and
+            .authorities.precedence == "none" and
+            .authorities.typespec.authority == "independently-authored" and
+            .authorities.jsonSchema.authority == "independently-authored" and
+            .authorities.typespec.generatedJsonSchemaRole == "comparison-evidence-only" and
+            .coverage.directDeclarationInventory == true and
+            .coverage.typespecGeneratedJsonSchemaComparison == true and
+            .coverage.differentialInstanceValidation == true and
+            .differential.summary.divergences == 0 and
+            .differential.summary.refusals == 0
+          ' .typespec-json-schema-validator/current-forward/report.json >/dev/null
+          jq -e '
+            .status == "passed" and
+            .admissible == true and
+            .admission.scope.complete == true and
+            .authorities.typespec == "independently-authored" and
+            .authorities.jsonSchema == "independently-authored" and
+            .authorities.generatedJsonSchema == "comparison-evidence-only" and
+            .authorities.precedence == "none"
+          ' .typespec-json-schema-validator/current-forward/contract-ir.json >/dev/null
+
+      - name: Prove authored sources and production lock stayed immutable
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- \
+            contracts/source-audit/main.tsp \
+            contracts/source-audit/authored.schema.json \
+            contracts/source-audit/tjsv.mapping.json \
+            tjsv/source-lock.json
+          test -s .typespec-json-schema-validator/current-forward/generated/typespec.generated.schema.json
+          test '.typespec-json-schema-validator/current-forward/generated/typespec.generated.schema.json' != 'contracts/source-audit/authored.schema.json'
+
+      - name: Retain current-validator evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tjsv-current-forward-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .typespec-json-schema-validator/current-forward/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 30
