@@ -1,0 +1,28 @@
+{
+  "schema": "ores.test.source-lock/v1",
+  "repository": "ORESoftware/ores-cli",
+  "pullRequest": 278,
+  "commit": "82ef4bae526abc64987a16485429f14a9ee04924",
+  "revisionRole": "product-candidate-head",
+  "focus": ".github/workflows/tjsv-current-forward-canary.yml",
+  "focusBlob": "b7803f4f83035b1417a1e6e991409da9aed8878c",
+  "certificate": {
+    "mode": "byte-identical-product-mirror",
+    "mirrorPath": "certification/ores-cli-current-tjsv/tjsv-current-forward-canary.yml"
+  },
+  "validator": {
+    "repository": "ORESoftware/typespec-json-schema-validator",
+    "revision": "c5392b03a405bb5296d1de09ac785b3b097529cd",
+    "role": "forward-compatibility-canary-only"
+  },
+  "productionLockPolicy": {
+    "mustRemainIndependent": true,
+    "mustNotBePromotedByCanary": true
+  },
+  "authorityModel": {
+    "typespec": "independently-authored-first-class",
+    "jsonSchema": "independently-authored-draft-2020-12-first-class",
+    "generatedJsonSchema": "comparison-evidence-only",
+    "precedence": "none"
+  }
+}
