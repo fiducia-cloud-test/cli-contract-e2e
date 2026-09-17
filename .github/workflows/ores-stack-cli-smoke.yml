@@ -1,0 +1,54 @@
+name: ores-stack CLI smoke
+
+on:
+  pull_request:
+    paths:
+      - 'ores-stack-smoke/**'
+      - '.github/workflows/ores-stack-cli-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ORES_STACK_REV: a43402cbd7d763cf082ac930f3164744966140ff
+
+jobs:
+  smoke:
+    if: ${{ vars.ENABLE_TEST_FLEET_INTEGRATION == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out test fixture
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Require protected cross-organization read credential
+        env:
+          TEST_FLEET_READ_TOKEN: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$TEST_FLEET_READ_TOKEN"
+      - name: Check out pinned ores-stack
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/ores-stack
+          ref: ${{ env.ORES_STACK_REV }}
+          path: .tmp/ores-stack
+          token: ${{ secrets.TEST_FLEET_READ_TOKEN }}
+          persist-credentials: false
+      - name: Build ores-stack CLI
+        run: cargo build --manifest-path .tmp/ores-stack/Cargo.toml -p ores-stack-cli --locked
+      - name: Exercise check routes build-plan and clean
+        run: |
+          set -euo pipefail
+          STACK="$GITHUB_WORKSPACE/.tmp/ores-stack/target/debug/ores-stack"
+          export ORES_STACK_ROOT="$GITHUB_WORKSPACE/ores-stack-smoke"
+          "$STACK" check
+          ORES_STACK_JSON=true "$STACK" routes | tee "$RUNNER_TEMP/routes.json"
+          "$STACK" build --no-exec
+          test -s "$ORES_STACK_ROOT/.ores-stack/route-manifest.json"
+          test -s "$ORES_STACK_ROOT/.ores-stack/page-docs.json"
+          test -s "$ORES_STACK_ROOT/.ores-stack/prerender-plan.json"
+          test -s "$ORES_STACK_ROOT/.ores-stack/build-plan.json"
+          grep -q '"/"' "$RUNNER_TEMP/routes.json"
+          "$STACK" clean
+          test ! -e "$ORES_STACK_ROOT/.ores-stack"
