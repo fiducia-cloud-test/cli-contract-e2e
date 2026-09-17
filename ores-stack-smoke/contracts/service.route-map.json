@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "service": "fiducia-cloud-test-ores-stack-smoke",
+  "map": {
+    "Health": "/healthz"
+  }
+}
