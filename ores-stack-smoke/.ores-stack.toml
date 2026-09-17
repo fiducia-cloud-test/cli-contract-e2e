@@ -1,0 +1,17 @@
+version = 1
+pages_dir = "src/pages"
+out_dir = ".ores-stack"
+dist_dir = "dist"
+strict = true
+api_docs_route_map = "contracts/service.route-map.json"
+
+[build]
+server = ["cargo", "build", "--locked"]
+
+[dev]
+preflight = ["cargo", "check", "--locked"]
+server = ["cargo", "run", "--locked"]
+watch = ["src", "contracts", ".ores-stack.toml"]
+ignore = [".git", ".ores-stack", "target", "dist"]
+reload_bind = "127.0.0.1:35729"
+browser_reload = true
