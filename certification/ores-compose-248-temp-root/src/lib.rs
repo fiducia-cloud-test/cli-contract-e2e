@@ -31,15 +31,11 @@ mod tests {
 
     #[test]
     fn harness_matches_upstream_temp_root_shape() {
-        assert!(UPSTREAM.contains(
-            "static TEST_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);"
-        ));
-        assert!(UPSTREAM.contains(
-            "let sequence = TEST_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);"
-        ));
-        assert!(UPSTREAM.contains(
-            "\"ores-compose-up-test-{}-{nonce}-{sequence}\","
-        ));
+        assert!(UPSTREAM.contains("static TEST_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(1);"));
+        assert!(
+            UPSTREAM.contains("let sequence = TEST_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);")
+        );
+        assert!(UPSTREAM.contains("\"ores-compose-up-test-{}-{nonce}-{sequence}\","));
         assert!(UPSTREAM.contains("std::process::id()"));
     }
 
@@ -47,9 +43,7 @@ mod tests {
     fn temp_roots_are_unique_under_parallel_threads() {
         const THREADS: usize = 64;
         const ROOTS_PER_THREAD: usize = 200;
-        let paths = Arc::new(Mutex::new(Vec::with_capacity(
-            THREADS * ROOTS_PER_THREAD,
-        )));
+        let paths = Arc::new(Mutex::new(Vec::with_capacity(THREADS * ROOTS_PER_THREAD)));
 
         let mut handles = Vec::with_capacity(THREADS);
         for _ in 0..THREADS {
@@ -89,7 +83,9 @@ mod tests {
             "temp-root name must bind the process id"
         );
         assert!(
-            name.rsplit('-').next().is_some_and(|part| part.parse::<u64>().is_ok()),
+            name.rsplit('-')
+                .next()
+                .is_some_and(|part| part.parse::<u64>().is_ok()),
             "temp-root name must end in an atomic sequence"
         );
     }
