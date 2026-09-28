@@ -20,14 +20,18 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Check out exact ores-compose fix revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ORESoftware/ores-compose
           ref: ceb2134c4f90f1a66e4a07166f1ea04d64be6b89
           path: ores-compose
+          persist-credentials: false
+          show-progress: false
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Report Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
 
       - name: Check exact source
         run: cargo check --locked --manifest-path ores-compose/Cargo.toml
