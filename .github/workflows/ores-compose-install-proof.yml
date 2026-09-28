@@ -1,0 +1,34 @@
+name: ores-compose-install-proof
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ores-compose-install-proof.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  install-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact ores-compose fix revision
+        uses: actions/checkout@v4
+        with:
+          repository: ORESoftware/ores-compose
+          ref: ceb2134c4f90f1a66e4a07166f1ea04d64be6b89
+          path: ores-compose
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check exact source
+        run: cargo check --locked --manifest-path ores-compose/Cargo.toml
+
+      - name: Install exact source
+        run: cargo install --locked --path ores-compose --root "$RUNNER_TEMP/ores-compose-install"
+
+      - name: Execute installed CLI
+        run: "$RUNNER_TEMP/ores-compose-install/bin/ores-compose" --help
