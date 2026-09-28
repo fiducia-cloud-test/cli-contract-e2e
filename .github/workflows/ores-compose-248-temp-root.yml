@@ -1,0 +1,78 @@
+name: ores-compose 248 temp-root certification
+
+on:
+  push:
+    branches:
+      - proof/ores-compose-248-temp-root
+    paths:
+      - 'certification/ores-compose-248-temp-root/**'
+      - '.github/workflows/ores-compose-248-temp-root.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: certify-${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - macos-15
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - name: Check out credential-free certification source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify exact private-source mirror identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          root='certification/ores-compose-248-temp-root'
+          test "$(git hash-object "$root/upstream-local_up_process.rs")" = 'a83c355826131063b319b72de33334de4ee48341'
+          grep -Fq '"sourceCommit": "20aa873ee10359a63043f4284ba6e2e6e533f37f"' "$root/UPSTREAM.json"
+          grep -Fq '"src/local_up_process.rs": "a83c355826131063b319b72de33334de4ee48341"' "$root/UPSTREAM.json"
+
+      - name: Install reviewed Rust toolchain
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          toolchain: 1.98.1
+          components: rustfmt,clippy
+
+      - name: Format
+        run: cargo fmt --manifest-path certification/ores-compose-248-temp-root/Cargo.toml --all -- --check
+
+      - name: Check
+        run: cargo check --manifest-path certification/ores-compose-248-temp-root/Cargo.toml --all-targets
+
+      - name: Thread stress tests
+        run: cargo test --manifest-path certification/ores-compose-248-temp-root/Cargo.toml --all-targets -- --nocapture
+
+      - name: Clippy
+        run: cargo clippy --manifest-path certification/ores-compose-248-temp-root/Cargo.toml --all-targets -- -D warnings
+
+      - name: Parallel-process uniqueness stress
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest='certification/ores-compose-248-temp-root/Cargo.toml'
+          cargo build --manifest-path "$manifest" --bin temp-root-id
+          bin='certification/ores-compose-248-temp-root/target/debug/temp-root-id'
+          paths="$RUNNER_TEMP/temp-root-paths.txt"
+          : > "$paths"
+          pids=()
+          for _ in {1..64}; do
+            "$bin" >> "$paths" &
+            pids+=("$!")
+          done
+          for pid in "${pids[@]}"; do
+            wait "$pid"
+          done
+          test "$(wc -l < "$paths" | tr -d ' ')" = 64
+          test "$(sort -u "$paths" | wc -l | tr -d ' ')" = 64

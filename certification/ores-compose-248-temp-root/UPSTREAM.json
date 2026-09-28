@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "ORESoftware/ores-compose",
+  "sourceCommit": "20aa873ee10359a63043f4284ba6e2e6e533f37f",
+  "sourcePullRequest": 248,
+  "privateSource": true,
+  "mirroredFiles": {
+    "src/local_up_process.rs": "a83c355826131063b319b72de33334de4ee48341"
+  },
+  "certificationScope": [
+    "exact source blob identity",
+    "parallel-thread temp-root uniqueness",
+    "parallel-process temp-root uniqueness",
+    "rustfmt/check/test/clippy on independent Rust harness"
+  ]
+}
